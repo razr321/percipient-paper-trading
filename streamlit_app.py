@@ -993,11 +993,14 @@ def build_fee_pie(metrics: dict) -> go.Figure:
         hole=0.4,
     ))
     fig.update_layout(
-        **CHART_LAYOUT,
+        paper_bgcolor=CLR_BG,
+        plot_bgcolor=CLR_CARD,
+        font=dict(color=CLR_TEXT, family="monospace", size=12),
+        margin=dict(l=50, r=30, t=40, b=40),
         title="Fee Breakdown",
         height=300,
         showlegend=True,
-        legend=dict(font=dict(size=10)),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
     )
     return fig
 
@@ -1024,11 +1027,14 @@ def build_allocation_pie(metrics: dict) -> go.Figure:
         hole=0.4,
     ))
     fig.update_layout(
-        **CHART_LAYOUT,
+        paper_bgcolor=CLR_BG,
+        plot_bgcolor=CLR_CARD,
+        font=dict(color=CLR_TEXT, family="monospace", size=12),
+        margin=dict(l=50, r=30, t=40, b=40),
         title="Strategy Allocation",
         height=300,
         showlegend=True,
-        legend=dict(font=dict(size=10)),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
     )
     return fig
 
