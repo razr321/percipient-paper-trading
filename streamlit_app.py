@@ -377,12 +377,18 @@ class PortfolioState:
 
     def open_position(self, strategy: str, symbol: str, side: str,
                       size_usd: float, price: float):
-        """Open a new position."""
+        """Open a new position. Deducts position size + fees from cash."""
         entry_fee = size_usd * DEFAULT_FEE
         slip_cost = size_usd * SLIPPAGE
         total_cost = entry_fee + slip_cost
 
-        self.cash -= total_cost
+        # Check sufficient cash
+        required = size_usd + total_cost
+        if self.cash < required:
+            return  # skip if not enough cash
+
+        # Deduct both position notional AND fees from cash
+        self.cash -= required
         self.total_trading_fees += entry_fee
         self.total_slippage_costs += slip_cost
 
@@ -828,10 +834,19 @@ def compute_metrics(state: PortfolioState, prices: dict) -> dict:
             "entry_time": pos.entry_time,
         })
 
+    # Compute total realized vs unrealized across all strategies
+    total_realized = sum(state.get_strategy_pnl(s) for s in state.strategy_allocs)
+    total_unrealized = 0.0
+    for pos in state.positions:
+        if pos.symbol in prices:
+            total_unrealized += state._calc_upnl(pos, prices[pos.symbol])
+
     return {
         "equity": round(eq, 2),
         "total_pnl": round(total_pnl, 2),
         "total_pnl_pct": round(total_pnl / state.starting_capital * 100, 2),
+        "realized_pnl": round(total_realized, 2),
+        "unrealized_pnl": round(total_unrealized, 2),
         "total_fees": round(total_fees, 2),
         "trading_fees": round(state.total_trading_fees, 2),
         "funding_fees": round(state.total_funding_fees, 2),
@@ -1131,20 +1146,26 @@ def main():
     # =========================================================================
     #  TOP ROW — Key Metrics
     # =========================================================================
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     equity = metrics["equity"]
     total_pnl = metrics["total_pnl"]
     pnl_pct = metrics["total_pnl_pct"]
+    realized_pnl = metrics.get("realized_pnl", 0)
+    unrealized_pnl = metrics.get("unrealized_pnl", 0)
     total_fees = metrics["total_fees"]
     max_dd = metrics["max_drawdown"]
     sharpe = metrics["sharpe"]
 
     col1.metric("Portfolio Equity", f"${equity:,.2f}", f"{pnl_pct:+.1f}%")
-    col2.metric("Total PnL", f"${total_pnl:+,.2f}", f"Net of fees")
-    col3.metric("Total Fees", f"${total_fees:,.2f}", f"Trading + Funding + Slip")
-    col4.metric("Max Drawdown", f"{max_dd:.2%}", f"From peak")
-    col5.metric("Sharpe (ann.)", f"{sharpe:.2f}", f"Calmar: {metrics['calmar']:.2f}")
+    col2.metric("Realized PnL", f"${realized_pnl:+,.2f}", "Closed trades only")
+    col3.metric("Unrealized PnL", f"${unrealized_pnl:+,.2f}", f"{len(metrics.get('open_positions', []))} open positions")
+    col4.metric("Total Fees", f"${total_fees:,.2f}", f"Trading + Slip")
+    col5.metric("Max Drawdown", f"{max_dd:.2%}", "From peak")
+    col6.metric("Sharpe (ann.)", f"{sharpe:.2f}", f"Calmar: {metrics['calmar']:.2f}")
+
+    # Cash available
+    st.caption(f"Cash: ${metrics.get('cash', 0):,.2f} | Total PnL (Realized + Unrealized): ${total_pnl:+,.2f}")
 
     st.divider()
 
